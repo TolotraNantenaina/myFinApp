@@ -1,14 +1,43 @@
-import { SQLiteDatabase } from 'expo-sqlite/legacy';
-import { openDatabase } from 'expo-sqlite/legacy';
+import { Platform } from 'react-native';
+import type { DatabaseInterface } from '@/store/database';
 
 // Migration pour créer les tables si elles n'existent pas
-export const migrateDbIfNeeded = (db: SQLiteDatabase): Promise<void> => {
+export const migrateDbIfNeeded = async (db: any): Promise<void> => {
   const DATABASE_VERSION = 1;
 
+  const categories = [
+    { name: 'Salaire', type: 'credit' },
+    { name: 'Cadeau', type: 'credit' },
+    { name: 'Remboursement', type: 'credit' },
+    { name: 'Alimentaire', type: 'debit' },
+    { name: 'Transport', type: 'debit' },
+    { name: 'Divertissement', type: 'debit' },
+    { name: 'Factures', type: 'debit' }
+  ];
+
+  if (Platform.OS === 'web') {
+    console.log('db => ', db);
+    
+    // IndexedDB : la création des stores est déjà gérée dans WebDatabase
+    // On vérifie juste l'existence des catégories par défaut
+    const result = await db.executeQuery('SELECT COUNT(*) as count FROM Categories');
+    const count = result?.count ?? 0;
+
+    if (count === 0) {
+      for (const category of categories) {
+        await db.executeQuery('INSERT INTO Categories (name, type) VALUES (?, ?)', [category.name, category.type]);
+        console.log(`Catégorie insérée : ${category.name}`);
+      }
+    }
+    // Pas besoin de gérer la version pour IndexedDB ici
+    return;
+  }
+
+  // Version mobile (SQLite)
   return new Promise((resolve, reject) => {
-    db.transaction(tx => {
+    db.transaction((tx: any) => {
       // Obtenir la version de la base de données
-      tx.executeSql('PRAGMA user_version', [], (_, { rows }) => {
+      tx.executeSql('PRAGMA user_version', [], (_: any, { rows }: any) => {
         let currentDbVersion = rows.item(0).user_version || 0;
 
         if (currentDbVersion >= DATABASE_VERSION) {
@@ -69,28 +98,12 @@ export const migrateDbIfNeeded = (db: SQLiteDatabase): Promise<void> => {
           `);
 
           // Vérifier si des catégories existent déjà
-          tx.executeSql('SELECT COUNT(*) as count FROM Categories', [], (_, { rows }) => {
-            const count = rows.item(0).count;
-
-            if (count === 0) {
-              // Insertion des catégories par défaut
-              const categories = [
-                { name: 'Salaire', type: 'credit' },
-                { name: 'Cadeau', type: 'credit' },
-                { name: 'Remboursement', type: 'credit' },
-                { name: 'Alimentaire', type: 'debit' },
-                { name: 'Transport', type: 'debit' },
-                { name: 'Divertissement', type: 'debit' },
-                { name: 'Factures', type: 'debit' }
-              ];
-
-              categories.forEach(category => {
-                tx.executeSql(
-                  'INSERT INTO Categories (name, type) VALUES (?, ?)',
-                  [category.name, category.type]
-                );
-              });
+          tx.executeSql('SELECT * FROM Categories', [], (_: any, { rows }: any) => {
+            const categories = [];
+            for (let i = 0; i < rows.length; i++) {
+              categories.push(rows.item(i));
             }
+            console.log('Catégories existantes :', categories);
           });
 
           // Mise à jour de la version de la base de données

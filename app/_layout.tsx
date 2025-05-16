@@ -50,8 +50,10 @@ export default function RootLayout() {
 
   // Initialisation de la base de données
   useEffect(() => {
+    /*** Grisé pour la version web pour **/
     const initializeDatabase = async () => {
       const db = await connectToDatabase();
+      console.log('base => :', db);
       await migrateDbIfNeeded(db); // Exécuter la migration
       const EmptyUser: boolean = await isUserTableEmpty();
       const EmptyTransaction: boolean = await isTransactionsTableEmpty();
@@ -60,6 +62,7 @@ export default function RootLayout() {
     };
 
     initializeDatabase();
+    // setIsUserEmpty(false);
   }, []);
 
   // Vérifiez les états avant de rendre
